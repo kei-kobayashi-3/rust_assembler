@@ -5,9 +5,30 @@ fn main() {
     let contents = read_file();
     let commands_list = get_commands(&contents);
 
-    for s in commands_list{
-        println!("{}", s);
+    let mut command_element: Vec<Command> = Vec::new();
+    for item in commands_list {
+
+        if item.contains("@"){
+            command_element.push(Command::ACommand(item[1..].to_string()));
+        }else if item.contains("(") {
+            command_element.push(Command::LCommand(item[1..item.len()-1].to_string()));
+        }else{
+            command_element.push(Command::CCommand(item[..].to_string()));
+        }
     }
+
+    for item in command_element{
+        print!("{:#?}", item);
+    }
+
+
+}
+
+#[derive(Debug)]
+enum Command {
+    ACommand(String),
+    CCommand(String),
+    LCommand(String),
 }
 
 fn read_file() -> String {
