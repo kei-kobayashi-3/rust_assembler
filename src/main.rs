@@ -19,26 +19,31 @@ fn main() {
     }
     let symbol_hashmap = config_element::get_symbol_hashmap(&symbolr_str);
 
-    let add_hashmap = insert_into_lcommand(&commands_enum, symbol_hashmap);
+    let mut add_hashmap = insert_into_lcommand(&commands_enum, symbol_hashmap);
 
 
     let result = command_tostring_list(
                                     &commands_enum,
-                                    &add_hashmap,
+                                    &mut add_hashmap,
                                     &comp_hashmap,
                                     &dest_hashmap,
                                     &jump_hashmap
                                   );
 
+    let mut outpath = String::new();
+    println!("Please input output_path.");
+    std::io::stdin().read_line(&mut outpath).expect("not found output_path.");
+    let mut wf = File::create(outpath.trim()).expect("failed make file");
 
-    let mut wf = File::create("Max.hack").expect("failed make file");
-    for s in result {
+    for s in &result {
         wf.write(s.as_bytes()).expect("can not write file");
     }
 
+
+
 }
 
-fn command_tostring_list<'a>(commands_enum: &Vec<Command>, add_hashmap: &HashMap<&str, u16>,
+fn command_tostring_list<'a>(commands_enum: &'a Vec<Command>, add_hashmap: &'a mut HashMap<&'a str, u16>,
                         comp_hashmap: &HashMap<&str,u16>, dest_hashmap: &HashMap<&str, u16>, jump_hashmap: &HashMap<&str, u16>) -> Vec< String>{
     let mut result: Vec<String> = Vec::new();
     for command in commands_enum{
@@ -46,12 +51,13 @@ fn command_tostring_list<'a>(commands_enum: &Vec<Command>, add_hashmap: &HashMap
         match command {
             Command::ACommand(s) => {
                 let str = match s.parse::<u16>() {
-                    Ok(n) => String::from(format!("{:>016b}", n)),
+                    Ok(n) => String::from(format!("{:>016b}\n", n)),
                     Err(_)=> {
                             match add_hashmap.get(s.as_str()){
                                Some(num) => String::from(format!("{:>016b}\n", num)),
                                _ => {
                                     i += 1;
+                                    add_hashmap.insert(s.as_str(), i);
                                     String::from(format!("{:>016b}\n",i))
                                     },
                             }
