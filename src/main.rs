@@ -41,16 +41,17 @@ fn main() {
 
 
 
+
 }
 
 fn command_tostring_list<'a>(commands_enum: &'a Vec<Command>, add_hashmap: &'a mut HashMap<&'a str, u16>,
                         comp_hashmap: &HashMap<&str,u16>, dest_hashmap: &HashMap<&str, u16>, jump_hashmap: &HashMap<&str, u16>) -> Vec< String>{
     let mut result: Vec<String> = Vec::new();
+    let mut i = 15;
     for command in commands_enum{
-        let mut i = 15;
         match command {
             Command::ACommand(s) => {
-                let str = match s.parse::<u16>() {
+                let str = match &s.parse::<u16>() {
                     Ok(n) => String::from(format!("{:>016b}\n", n)),
                     Err(_)=> {
                             match add_hashmap.get(s.as_str()){
