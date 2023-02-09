@@ -1,4 +1,4 @@
-use std::{fs::File, io::Read, collections::HashMap};
+use std::{fs::File, io::{Read, Write}, collections::HashMap};
 use assembler_rust::config_element;
 
 fn main() {
@@ -9,11 +9,8 @@ fn main() {
 
     // symbol table
     let dest_hashmap = config_element::get_dest_hashmap();
-
     let comp_hashmap = config_element::get_comp_hashmap();
-
     let jump_hashmap = config_element::get_jump_hashmap();
-
     let mut symbolr_str:Vec<String> = Vec::new();
     for i in 0..16 {
         let mut s:String = String::from("R");
@@ -21,21 +18,41 @@ fn main() {
         symbolr_str.push(s);
     }
     let symbol_hashmap = config_element::get_symbol_hashmap(&symbolr_str);
+
     let add_hashmap = insert_into_lcommand(&commands_enum, symbol_hashmap);
 
-    let mut result = Vec::new();
-    for command in &commands_enum{
+
+    let result = command_tostring_list(
+                                    &commands_enum,
+                                    &add_hashmap,
+                                    &comp_hashmap,
+                                    &dest_hashmap,
+                                    &jump_hashmap
+                                  );
+
+
+    let mut wf = File::create("Max.hack").expect("failed make file");
+    for s in result {
+        wf.write(s.as_bytes()).expect("can not write file");
+    }
+
+}
+
+fn command_tostring_list<'a>(commands_enum: &Vec<Command>, add_hashmap: &HashMap<&str, u16>,
+                        comp_hashmap: &HashMap<&str,u16>, dest_hashmap: &HashMap<&str, u16>, jump_hashmap: &HashMap<&str, u16>) -> Vec< String>{
+    let mut result: Vec<String> = Vec::new();
+    for command in commands_enum{
         let mut i = 15;
         match command {
             Command::ACommand(s) => {
                 let str = match s.parse::<u16>() {
                     Ok(n) => String::from(format!("{:>016b}", n)),
                     Err(_)=> {
-                            match &add_hashmap.get(&s.as_str()){
-                               Some(num) => String::from(format!("{:>016b}", num)),
+                            match add_hashmap.get(s.as_str()){
+                               Some(num) => String::from(format!("{:>016b}\n", num)),
                                _ => {
                                     i += 1;
-                                    String::from(format!("{:>016b}",i))
+                                    String::from(format!("{:>016b}\n",i))
                                     },
                             }
                         }
@@ -43,24 +60,24 @@ fn main() {
                 result.push(str);
             },
             Command::CCommand(s) => {
-                let str = match &s.find("="){
-                    Some(n) =>  { let ss = match &s.find(";") {
-                                 Some(n) =>
-                                        String::from(format!("111{:>07b}{:>03b}{:>03b}",
-                                        &comp_hashmap.get(&s[(n+1)..s.find(";").unwrap()]).unwrap(),
-                                        &dest_hashmap.get(&s[..*n]).unwrap(),
-                                        &jump_hashmap.get(&s[(s.find(";").unwrap()+1)..]).unwrap())),
+                let str = match s.find("="){
+                    Some(ne) =>  { let ss = match s.find(";") {
+                                 Some(nk) =>
+                                        String::from(format!("111{:>07b}{:>03b}{:>03b}\n",
+                                        comp_hashmap.get(&s[((ne+1)..nk)]).unwrap(),
+                                        dest_hashmap.get(&s[..ne]).unwrap(),
+                                        jump_hashmap.get(&s[(nk+1)..]).unwrap())),
                                  None =>
-                                        String::from(format!("111{:>07b}{:>03b}000",
-                                        &comp_hashmap.get(&s[(n+1)..]).unwrap(),
-                                        &dest_hashmap.get(&s[..*n]).unwrap())),
+                                        String::from(format!("111{:>07b}{:>03b}000\n",
+                                        comp_hashmap.get(&s[(ne+1)..]).unwrap(),
+                                        dest_hashmap.get(&s[..ne]).unwrap())),
                                     };
                                 ss
                                 },
                     None => {
-                        String::from(format!("111{:>07b}000{:>03b}",
-                                        &comp_hashmap.get(&s[..s.find(";").unwrap()]).unwrap(),
-                                        &jump_hashmap.get(&s[(s.find(";").unwrap()+1)..]).unwrap()))
+                        String::from(format!("111{:>07b}000{:>03b}\n",
+                                        comp_hashmap.get(&s[..s.find(";").unwrap()]).unwrap(),
+                                        jump_hashmap.get(&s[(s.find(";").unwrap()+1)..]).unwrap()))
                             },
                         };
                 result.push(str);
@@ -69,12 +86,10 @@ fn main() {
             Command::LCommand(_) => (),
             }
         }
+        result
 
-        for s in result{
-            println!("{}", s);
-        }
+
 }
-
 
 fn insert_into_lcommand<'a>(commands_enum: &'a Vec<Command>, mut symbol_hashmap: HashMap<&'a str, u16>) -> HashMap<&'a str, u16>{
     let mut i = 0;
