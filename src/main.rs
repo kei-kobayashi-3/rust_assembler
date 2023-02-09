@@ -1,4 +1,5 @@
 use std::{fs::File, io::Read, collections::HashMap};
+use assembler_rust::config_element;
 
 fn main() {
 
@@ -6,63 +7,86 @@ fn main() {
     let commands_list = get_commands(&contents);
     let commands_enum = get_command_enum(commands_list);
 
-
-
-
-
-
     // symbol table
-    let dest_mnemonic = vec!["","M","D","MD","A","AM","AD","AMD"];
-    let dest_hashmap = get_dest_hashmap(dest_mnemonic);
+    let dest_hashmap = config_element::get_dest_hashmap();
 
-    let comp_mnemonic = vec!["0","1","-1","D","A","!D","!A","-D","-A","D+1",
-                                        "A+1","D-1","A-1","D+A","D-A","A-D","D&A","D|A",
-                                        "M","!M","-M","M+1","M-1","D+M","D-M","M-D","D&M","D|M"];
-    let comp_hashmap = get_comp_hashmap(comp_mnemonic);
+    let comp_hashmap = config_element::get_comp_hashmap();
 
-    let jump_mnemonic = vec!["","JGT","JEQ","JGE","JLT","JNE","JLE","JMP"];
-    let jump_hashmap = get_jump_hashmap(jump_mnemonic);
+    let jump_hashmap = config_element::get_jump_hashmap();
 
-    let symbol_str = vec!["SP","LCL","ARG","THIS","THAT","SCREEN","KBD"];
     let mut symbolr_str:Vec<String> = Vec::new();
     for i in 0..16 {
-        let mut s = String::from("R");
-        s = s + i.to_string().as_str();
+        let mut s:String = String::from("R");
+        s += i.to_string().as_str();
         symbolr_str.push(s);
     }
-    let mut symbol_hashmap = get_symbol_hashmap(symbol_str, &symbolr_str);
+    let symbol_hashmap = config_element::get_symbol_hashmap(&symbolr_str);
+    let add_hashmap = insert_into_lcommand(&commands_enum, symbol_hashmap);
 
-    println!("{:#?}", commands_enum);
+    let mut result = Vec::new();
+    for command in &commands_enum{
+        let mut i = 15;
+        match command {
+            Command::ACommand(s) => {
+                let str = match s.parse::<u16>() {
+                    Ok(n) => String::from(format!("{:>016b}", n)),
+                    Err(_)=> {
+                            match &add_hashmap.get(&s.as_str()){
+                               Some(num) => String::from(format!("{:>016b}", num)),
+                               _ => {
+                                    i += 1;
+                                    String::from(format!("{:>016b}",i))
+                                    },
+                            }
+                        }
+                    };
+                result.push(str);
+            },
+            Command::CCommand(s) => {
+                let str = match &s.find("="){
+                    Some(n) =>  { let ss = match &s.find(";") {
+                                 Some(n) =>
+                                        String::from(format!("111{:>07b}{:>03b}{:>03b}",
+                                        &comp_hashmap.get(&s[(n+1)..s.find(";").unwrap()]).unwrap(),
+                                        &dest_hashmap.get(&s[..*n]).unwrap(),
+                                        &jump_hashmap.get(&s[(s.find(";").unwrap()+1)..]).unwrap())),
+                                 None =>
+                                        String::from(format!("111{:>07b}{:>03b}000",
+                                        &comp_hashmap.get(&s[(n+1)..]).unwrap(),
+                                        &dest_hashmap.get(&s[..*n]).unwrap())),
+                                    };
+                                ss
+                                },
+                    None => {
+                        String::from(format!("111{:>07b}000{:>03b}",
+                                        &comp_hashmap.get(&s[..s.find(";").unwrap()]).unwrap(),
+                                        &jump_hashmap.get(&s[(s.find(";").unwrap()+1)..]).unwrap()))
+                            },
+                        };
+                result.push(str);
 
+                },
+            Command::LCommand(_) => (),
+            }
+        }
 
-
+        for s in result{
+            println!("{}", s);
+        }
 }
 
-fn get_dest_hashmap(dest_mnemonic: Vec<&str>) -> HashMap<&str, u16>{
-    let dest_hashmap: HashMap<_,_> = dest_mnemonic.into_iter().zip(0..=7).collect();
-    dest_hashmap
-}
-fn get_comp_hashmap(comp_mnemonic: Vec<&str>) -> HashMap<&str, u16>{
-    let comp_num: Vec<u16> = vec![42, 63, 58, 12, 48, 13, 49, 15,
-    51, 31, 55, 14, 50, 2, 19, 7, 0, 21,
-    112, 113, 115, 119, 114, 66, 83, 71, 64, 85];
-    let comp_hashmap: HashMap<_,_> = comp_mnemonic.into_iter().zip(comp_num.into_iter()).collect();
-    comp_hashmap
-}
-fn get_jump_hashmap(jump_mnemonic: Vec<&str>) -> HashMap<&str, u16>{
-    let jump_hashmap: HashMap<_,_> = jump_mnemonic.into_iter().zip(0..=7).collect();
-    jump_hashmap
-}
-fn get_symbol_hashmap<'a>(symbol_str: Vec<&'a str>, symbolr_str: &'a Vec<String>) -> HashMap<&'a str, u16>{
-    let symbol_num: Vec<u16> = vec![0, 1, 2, 3, 4, 16384, 24576];
-    let mut symbol_hashmap: HashMap<_,_> = symbol_str.into_iter().zip(symbol_num).collect();
 
-    for i  in 0..16 {
-        symbol_hashmap.insert(&symbolr_str[i], i as u16);
+fn insert_into_lcommand<'a>(commands_enum: &'a Vec<Command>, mut symbol_hashmap: HashMap<&'a str, u16>) -> HashMap<&'a str, u16>{
+    let mut i = 0;
+    for command in commands_enum {
+        if let Command::LCommand(s) = command {
+            symbol_hashmap.insert(&s, i);
+        }else {
+            i += 1;
+        }
     }
     symbol_hashmap
 }
-
 
 fn get_command_enum(command_list: Vec<&str>) -> Vec<Command>{
     let mut command_element: Vec<Command> = Vec::new();
