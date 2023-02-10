@@ -21,7 +21,6 @@ fn main() {
 
     let mut add_hashmap = insert_into_lcommand(&commands_enum, symbol_hashmap);
 
-
     let result = command_tostring_list(
                                     &commands_enum,
                                     &mut add_hashmap,
